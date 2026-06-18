@@ -1,12 +1,6 @@
 # Import necessary libraries.
-import os
-from dotenv import load_dotenv
-
+from src.config import TOKEN
 from src.dc.bot import create_bot
-
-# Load environment variables.
-load_dotenv()
-TOKEN: str = str(os.getenv('TOKEN'))
 
 
 def main():
