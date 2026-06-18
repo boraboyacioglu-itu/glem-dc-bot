@@ -16,3 +16,6 @@ __pycache__/
 
 # Design
 *.af*
+
+# Database
+*.db

@@ -15,7 +15,7 @@ class GLEM(discord.Client):
         self.conversation: Conversation = Conversation(create_client())
 
     async def on_ready(self):
-        print(f'Logged in as {self.user}.')
+        print(f"Logged in as {self.user}.")
 
     async def on_message(self, message: discord.Message):
         # Ignore the bot's own messages.
@@ -30,6 +30,7 @@ class GLEM(discord.Client):
         async with message.channel.typing():
             reply: str = self.conversation.reply(message.author.id, message.content)
         if reply:
+            # print(f"Replying to user {message.author.id}.")
             await message.channel.send(reply)
 
 

@@ -1,8 +1,8 @@
 # Import necessary libraries.
 from openai import OpenAI
-from openai.types.chat.chat_completion import ChatCompletion
+from openai.types.responses import Response
 
-from src.config import API_KEY, MODEL, TEMPERATURE, MAX_TOKENS
+from src.config import API_KEY, MODEL, TEMPERATURE, MAX_TOKENS, SYSTEM_PROMPT
 
 
 def create_client() -> OpenAI:
@@ -10,15 +10,15 @@ def create_client() -> OpenAI:
     return OpenAI(api_key=API_KEY)
 
 
-def get_response(client: OpenAI, messages: list) -> str:
-    # Get the response.
-    response: ChatCompletion = client.chat.completions.create(
+def get_response(client: OpenAI, user_inp: str,
+                 previous_response_id: str | None) -> Response:
+    # Continue the user's conversation chain, or start a new one.
+    return client.responses.create(
         model=MODEL,
-        messages=messages,
+        instructions=SYSTEM_PROMPT,
+        input=user_inp,
+        previous_response_id=previous_response_id,
+        store=True,
         temperature=TEMPERATURE,
-        max_tokens=MAX_TOKENS,
+        max_output_tokens=MAX_TOKENS,
     )
-
-    # Return the reply text, or an empty string if there is none.
-    reply: str = str(response.choices[0].message.content)
-    return reply if reply else ''
