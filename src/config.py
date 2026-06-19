@@ -23,4 +23,4 @@ SYSTEM_PROMPT: str = (
 )
 
 # 
-COMMON_USER_COUNT: int = 5
+COMMON_USER_COUNT: int = 2

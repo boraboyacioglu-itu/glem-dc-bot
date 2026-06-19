@@ -16,6 +16,11 @@ class Store:
             'response_id TEXT NOT NULL, '
             "preferences TEXT NOT NULL DEFAULT '[]')"
         )
+        self.conn.execute(
+            'CREATE TABLE IF NOT EXISTS channels ('
+            'game TEXT PRIMARY KEY, '
+            'channel_id INTEGER NOT NULL)'
+        )
         self._migrate()
         self.conn.commit()
 
@@ -65,5 +70,33 @@ class Store:
             "VALUES (?, '', ?) "
             'ON CONFLICT(user_id) DO UPDATE SET preferences = excluded.preferences',
             (user_id, encoded),
+        )
+        self.conn.commit()
+
+    def users_with_game(self, game: str) -> list[int]:
+        # Return the IDs of all users whose preferences include the given game.
+        rows: list = self.conn.execute(
+            'SELECT user_id, preferences FROM conversations'
+        ).fetchall()
+        return [
+            user_id
+            for user_id, preferences in rows
+            if any(game in entry for entry in json.loads(preferences))
+        ]
+
+    def get_channel(self, game: str) -> int | None:
+        # Return the channel ID created for the game, or None if there is none.
+        row: tuple | None = self.conn.execute(
+            'SELECT channel_id FROM channels WHERE game = ?',
+            (game,),
+        ).fetchone()
+        return row[0] if row else None
+
+    def set_channel(self, game: str, channel_id: int) -> None:
+        # Record the channel created for a game.
+        self.conn.execute(
+            'INSERT INTO channels (game, channel_id) VALUES (?, ?) '
+            'ON CONFLICT(game) DO UPDATE SET channel_id = excluded.channel_id',
+            (game, channel_id),
         )
         self.conn.commit()

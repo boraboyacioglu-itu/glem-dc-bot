@@ -36,6 +36,14 @@ class Conversation:
 
         return response.output_text
 
+    def current_games(self, user_id: int) -> set[str]:
+        # Return the set of game names currently in the user's preferences.
+        return {
+            game
+            for entry in self.store.get_preferences(user_id)
+            for game in entry
+        }
+
     def greet(self, user_id: int) -> str:
         # Open a conversation with a new user, asking about their games.
         instructions: str = build_instructions(self.store.get_preferences(user_id))

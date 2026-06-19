@@ -1,6 +1,7 @@
 # Import necessary libraries.
 import discord
 
+from src.dc.groups import InterestGroups
 from src.llm.client import create_client
 from src.llm.conversation import Conversation
 
@@ -14,6 +15,8 @@ class GLEM(discord.Client):
 
         # Set up the AI client and the per-user conversation manager.
         self.conversation: Conversation = Conversation(create_client())
+        # Manage game interest groups over the shared store.
+        self.groups: InterestGroups = InterestGroups(self, self.conversation.store)
 
     async def on_ready(self):
         print(f"Logged in as {self.user}.")
@@ -38,12 +41,21 @@ class GLEM(discord.Client):
         if not isinstance(message.channel, discord.DMChannel):
             return
 
+        # Track the user's games before and after this message.
+        user_id: int = message.author.id
+        before: set[str] = self.conversation.current_games(user_id)
+
         # Generate and send the reply.
         async with message.channel.typing():
-            reply: str = self.conversation.reply(message.author.id, message.content)
+            reply: str = self.conversation.reply(user_id, message.content)
         if reply:
             # print(f"Replying to user {message.author.id}.")
             await message.channel.send(reply)
+
+        # React to any games the user newly showed interest in.
+        after: set[str] = self.conversation.current_games(user_id)
+        for game in after - before:
+            await self.groups.on_new_interest(user_id, game)
 
 
 def create_bot() -> GLEM:
