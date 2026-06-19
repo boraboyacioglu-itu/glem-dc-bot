@@ -9,6 +9,7 @@ class GLEM(discord.Client):
     def __init__(self):
         intents: discord.Intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True
         super().__init__(intents=intents)
 
         # Set up the AI client and the per-user conversation manager.
@@ -16,6 +17,17 @@ class GLEM(discord.Client):
 
     async def on_ready(self):
         print(f"Logged in as {self.user}.")
+
+    async def on_member_join(self, member: discord.Member):
+        # Ignore other bots.
+        if member.bot:
+            return
+
+        # Direct message the new member to ask about their games.
+        greeting: str = self.conversation.greet(member.id)
+        if greeting:
+            channel: discord.DMChannel = await member.create_dm()
+            await channel.send(greeting)
 
     async def on_message(self, message: discord.Message):
         # Ignore the bot's own messages.

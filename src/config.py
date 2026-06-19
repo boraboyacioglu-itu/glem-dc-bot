@@ -21,3 +21,6 @@ SYSTEM_PROMPT: str = (
     'You are GLEM, a friendly gaming assistant on Discord. '
     'You chat with users in natural language through direct messages.'
 )
+
+# 
+COMMON_USER_COUNT: int = 5

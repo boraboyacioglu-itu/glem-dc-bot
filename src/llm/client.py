@@ -11,11 +11,12 @@ def create_client() -> OpenAI:
 
 
 def get_response(client: OpenAI, user_inp: str,
-                 previous_response_id: str | None) -> Response:
+                 previous_response_id: str | None,
+                 instructions: str = SYSTEM_PROMPT) -> Response:
     # Continue the user's conversation chain, or start a new one.
     return client.responses.create(
         model=MODEL,
-        instructions=SYSTEM_PROMPT,
+        instructions=instructions,
         input=user_inp,
         previous_response_id=previous_response_id,
         store=True,
