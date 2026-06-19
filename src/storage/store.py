@@ -1,102 +1,106 @@
 # Import necessary libraries.
 import json
-import sqlite3
+import os
 
-from src.config import DB_PATH
+from src.config import DATA_PATH
 
 
 class Store:
+    # Persists all bot data in a single JSON file.
 
-    def __init__(self, path: str = DB_PATH):
-        # Open the connection and ensure the schema exists.
-        self.conn: sqlite3.Connection = sqlite3.connect(path)
-        self.conn.execute(
-            'CREATE TABLE IF NOT EXISTS conversations ('
-            'user_id INTEGER PRIMARY KEY, '
-            'response_id TEXT NOT NULL, '
-            "preferences TEXT NOT NULL DEFAULT '[]')"
-        )
-        self.conn.execute(
-            'CREATE TABLE IF NOT EXISTS channels ('
-            'game TEXT PRIMARY KEY, '
-            'channel_id INTEGER NOT NULL)'
-        )
-        self._migrate()
-        self.conn.commit()
+    def __init__(self, path: str = DATA_PATH):
+        self.path: str = path
+        # Load existing data, or start with an empty structure.
+        if os.path.exists(path):
+            with open(path, 'r') as file:
+                self.data: dict = json.load(file)
+        else:
+            self.data = {'conversations': {}, 'channels': {}}
 
-    def _migrate(self) -> None:
-        # Add the preferences column to databases created before it existed.
-        names: set = {
-            column[1]
-            for column in self.conn.execute('PRAGMA table_info(conversations)')
-        }
-        if 'preferences' not in names:
-            self.conn.execute(
-                "ALTER TABLE conversations "
-                "ADD COLUMN preferences TEXT NOT NULL DEFAULT '[]'"
-            )
+    def _save(self) -> None:
+        # Write the whole structure back to disk.
+        with open(self.path, 'w') as file:
+            json.dump(self.data, file, indent=2)
+
+    def _user(self, user_id: int) -> dict:
+        # Return the user's record, creating a default one if needed.
+        return self.data['conversations'].setdefault(
+            str(user_id),
+            {
+                'response_id': '',
+                'preferences': [],
+                'onboarded': False,
+                'voice_channels': [],
+            },
+        )
 
     def get_response_id(self, user_id: int) -> str | None:
-        # Return the user's latest response ID,
-        # or None if they are new.
-        row: tuple | None = self.conn.execute(
-            'SELECT response_id FROM conversations WHERE user_id = ?',
-            (user_id,),
-        ).fetchone()
-        return row[0] if row else None
+        # Return the user's latest response ID, or None if there is none yet.
+        record: dict | None = self.data['conversations'].get(str(user_id))
+        return record['response_id'] if record and record['response_id'] else None
 
     def set_response_id(self, user_id: int, response_id: str) -> None:
         # Insert or update the user's latest response ID.
-        self.conn.execute(
-            'INSERT INTO conversations (user_id, response_id) VALUES (?, ?) '
-            'ON CONFLICT(user_id) DO UPDATE SET response_id = excluded.response_id',
-            (user_id, response_id),
-        )
-        self.conn.commit()
+        self._user(user_id)['response_id'] = response_id
+        self._save()
 
     def get_preferences(self, user_id: int) -> list[dict]:
         # Return the user's game preferences as a list of {game: level} dicts.
-        row: tuple | None = self.conn.execute(
-            'SELECT preferences FROM conversations WHERE user_id = ?',
-            (user_id,),
-        ).fetchone()
-        return json.loads(row[0]) if row else []
+        record: dict | None = self.data['conversations'].get(str(user_id))
+        return record['preferences'] if record else []
 
     def set_preferences(self, user_id: int, preferences: list[dict]) -> None:
         # Insert or update the user's game preferences.
-        encoded: str = json.dumps(preferences)
-        self.conn.execute(
-            'INSERT INTO conversations (user_id, response_id, preferences) '
-            "VALUES (?, '', ?) "
-            'ON CONFLICT(user_id) DO UPDATE SET preferences = excluded.preferences',
-            (user_id, encoded),
-        )
-        self.conn.commit()
+        self._user(user_id)['preferences'] = preferences
+        self._save()
+
+    def get_onboarded(self, user_id: int) -> bool:
+        # Return whether the user has provided at least one interest.
+        record: dict | None = self.data['conversations'].get(str(user_id))
+        return bool(record['onboarded']) if record else False
+
+    def set_onboarded(self, user_id: int, onboarded: bool) -> None:
+        # Mark whether the user has been onboarded.
+        self._user(user_id)['onboarded'] = int(onboarded)
+        self._save()
+
+    def get_voice_channels(self, user_id: int) -> list[str]:
+        # Return the list of games whose channels the user has joined.
+        record: dict | None = self.data['conversations'].get(str(user_id))
+        return record['voice_channels'] if record else []
+
+    def add_voice_channel(self, user_id: int, game: str) -> None:
+        # Record that the user joined the given game's channel.
+        channels: list[str] = self._user(user_id)['voice_channels']
+        if game not in channels:
+            channels.append(game)
+            self._save()
+
+    def users_in_channel(self, game: str) -> list[int]:
+        # Return the IDs of all users who joined the game's voice channel.
+        return [
+            int(user_id)
+            for user_id, record in self.data['conversations'].items()
+            if game in record['voice_channels']
+        ]
 
     def users_with_game(self, game: str) -> list[int]:
         # Return the IDs of all users whose preferences include the given game.
-        rows: list = self.conn.execute(
-            'SELECT user_id, preferences FROM conversations'
-        ).fetchall()
         return [
-            user_id
-            for user_id, preferences in rows
-            if any(game in entry for entry in json.loads(preferences))
+            int(user_id)
+            for user_id, record in self.data['conversations'].items()
+            if any(game in entry for entry in record['preferences'])
         ]
 
     def get_channel(self, game: str) -> int | None:
         # Return the channel ID created for the game, or None if there is none.
-        row: tuple | None = self.conn.execute(
-            'SELECT channel_id FROM channels WHERE game = ?',
-            (game,),
-        ).fetchone()
-        return row[0] if row else None
+        return self.data['channels'].get(game)
 
     def set_channel(self, game: str, channel_id: int) -> None:
         # Record the channel created for a game.
-        self.conn.execute(
-            'INSERT INTO channels (game, channel_id) VALUES (?, ?) '
-            'ON CONFLICT(game) DO UPDATE SET channel_id = excluded.channel_id',
-            (game, channel_id),
-        )
-        self.conn.commit()
+        self.data['channels'][game] = channel_id
+        self._save()
+
+    def list_channels(self) -> list[str]:
+        # Return the names of all games that have a channel.
+        return list(self.data['channels'].keys())

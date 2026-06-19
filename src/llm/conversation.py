@@ -21,12 +21,16 @@ class Conversation:
         updated: list[dict] = extract_preferences(self.client, user_inp, current)
         if updated != current:
             self.store.set_preferences(user_id, updated)
+        # Mark onboarded once the user has at least one interest on record.
+        self.store.set_onboarded(user_id, bool(updated))
         return updated
 
     def reply(self, user_id: int, user_inp: str) -> str:
         # Keep preferences current, then answer with them in context.
         preferences: list[dict] = self._update_preferences(user_id, user_inp)
-        instructions: str = build_instructions(preferences)
+        instructions: str = build_instructions(
+            preferences, self.store.get_onboarded(user_id)
+        )
 
         prev_rid: str | None = self.store.get_response_id(user_id)
         response: Response = get_response(
@@ -46,7 +50,10 @@ class Conversation:
 
     def greet(self, user_id: int) -> str:
         # Open a conversation with a new user, asking about their games.
-        instructions: str = build_instructions(self.store.get_preferences(user_id))
+        instructions: str = build_instructions(
+            self.store.get_preferences(user_id),
+            self.store.get_onboarded(user_id),
+        )
 
         prev_rid: str | None = self.store.get_response_id(user_id)
         response: Response = get_response(

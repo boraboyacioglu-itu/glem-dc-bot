@@ -17,5 +17,6 @@ __pycache__/
 # Design
 *.af*
 
-# Database
-*.db
+# Data
+glem.json
+events.json

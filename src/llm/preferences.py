@@ -1,10 +1,17 @@
 # Import necessary libraries.
 import json
+import re
 
 from openai import OpenAI
 from openai.types.responses import Response
 
 from src.config import MODEL, SYSTEM_PROMPT
+
+
+def normalize_game(name: str) -> str:
+    # Reduce a game name to lowercase alphanumerics for reliable matching.
+    name = re.sub(r'[^a-z0-9 ]', '', name.lower())
+    return re.sub(r'\s+', ' ', name).strip()
 
 # Instructions for the extraction call that maintains the preferences list.
 EXTRACT_PROMPT: str = (
@@ -33,20 +40,28 @@ def extract_preferences(client: OpenAI, user_inp: str,
     # Parse the JSON reply, falling back to the current list on any failure.
     try:
         parsed = json.loads(response.output_text)
-        return parsed if isinstance(parsed, list) else current
     except (json.JSONDecodeError, TypeError):
         return current
+    if not isinstance(parsed, list):
+        return current
+
+    # Normalize every game name so common interests match reliably.
+    return [
+        {normalize_game(game): level for game, level in entry.items()}
+        for entry in parsed
+        if isinstance(entry, dict)
+    ]
 
 
-def build_instructions(preferences: list[dict]) -> str:
-    # Extend the base system prompt with the user's known preferences.
-    if preferences:
+def build_instructions(preferences: list[dict], onboarded: bool) -> str:
+    # Once onboarded, just give the bot the user's known preferences.
+    if onboarded:
         return (
             f'{SYSTEM_PROMPT}\n\n'
             f'The user\'s known game preferences are: {json.dumps(preferences)}.'
         )
 
-    # While the list is empty, the bot should ask about the user's games.
+    # Until then, the bot should ask about the user's games.
     return (
         f'{SYSTEM_PROMPT}\n\n'
         'You do not yet know which games this user plays. In your reply, '

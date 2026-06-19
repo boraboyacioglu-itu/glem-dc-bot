@@ -72,6 +72,8 @@ class InterestGroups:
             channel_id = channel.id
 
         await self._grant_access(user_id, channel_id)
+        # Only users who actually join are added to their voice channels.
+        self.store.add_voice_channel(user_id, game)
 
     async def _grant_access(self, user_id: int, channel_id: int) -> None:
         # Allow the user into the channel and send them a jump link.
