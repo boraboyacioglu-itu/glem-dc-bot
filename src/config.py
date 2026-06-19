@@ -28,6 +28,9 @@ DATETIME_FORMAT: str = '%Y-%m-%d %H:%M'
 # Event duration options offered to the organizer, in hours.
 EVENT_DURATIONS: list[int] = [1, 2, 3]
 
+# Path to the log file.
+LOG_PATH: str = 'glem.log'
+
 # System prompt.
 SYSTEM_PROMPT: str = (
     'You are GLEM, a friendly gaming assistant on Discord. '

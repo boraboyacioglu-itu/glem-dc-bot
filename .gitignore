@@ -20,3 +20,6 @@ __pycache__/
 # Data
 glem.json
 events.json
+
+# Logs
+glem.log

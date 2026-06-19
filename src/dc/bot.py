@@ -6,7 +6,8 @@ from src.dc.groups import InterestGroups
 from src.dc.scheduling import EventScheduler
 from src.llm.client import create_client
 from src.llm.conversation import Conversation
-from src.llm.intent import wants_event
+from src.llm.intent import extract_event_details, wants_event
+from src.logger import logger
 from src.storage.events import EventStore
 
 
@@ -31,7 +32,11 @@ class GLEM(discord.Client):
         )
 
     async def on_ready(self):
-        print(f"Logged in as {self.user}.")
+        logger.info('Logged in as %s.', self.user)
+
+    async def on_error(self, event_method: str, *args, **kwargs):
+        # Log any uncaught error raised inside an event handler.
+        logger.exception('Unhandled error in %s.', event_method)
 
     async def on_member_join(self, member: discord.Member):
         # Ignore other bots.
@@ -54,6 +59,7 @@ class GLEM(discord.Client):
             return
 
         user_id: int = message.author.id
+        logger.info('DM from %s: %s', user_id, message.content)
 
         # If the user is mid-way through scheduling, continue that flow.
         if self.scheduler.is_active(user_id):
@@ -64,7 +70,11 @@ class GLEM(discord.Client):
 
         # Start the scheduling wizard if the user wants to create an event.
         if wants_event(self.conversation.client, message.content):
-            await self.scheduler.start(user_id, message.channel)
+            logger.info('Starting event wizard for %s.', user_id)
+            details: dict = extract_event_details(
+                self.conversation.client, message.content
+            )
+            await self.scheduler.start(user_id, message.channel, details)
             return
 
         # Track the user's games before and after this message.
@@ -74,7 +84,7 @@ class GLEM(discord.Client):
         async with message.channel.typing():
             reply: str = self.conversation.reply(user_id, message.content)
         if reply:
-            # print(f"Replying to user {message.author.id}.")
+            logger.info('Reply to %s: %s', user_id, reply)
             await message.channel.send(reply)
 
         # React to any games the user newly showed interest in.

@@ -54,6 +54,15 @@ class Store:
         self._user(user_id)['preferences'] = preferences
         self._save()
 
+    def add_preference(self, user_id: int, game: str,
+                       level: str = 'beginner') -> None:
+        # Add a game to the user's preferences if it is not already there.
+        preferences: list[dict] = self.get_preferences(user_id)
+        if any(game in entry for entry in preferences):
+            return
+        preferences.append({game: level})
+        self.set_preferences(user_id, preferences)
+
     def get_onboarded(self, user_id: int) -> bool:
         # Return whether the user has provided at least one interest.
         record: dict | None = self.data['conversations'].get(str(user_id))
@@ -104,3 +113,12 @@ class Store:
     def list_channels(self) -> list[str]:
         # Return the names of all games that have a channel.
         return list(self.data['channels'].keys())
+
+    def game_popularity(self) -> dict[str, int]:
+        # Count how many users are interested in each game, across everyone.
+        counts: dict[str, int] = {}
+        for record in self.data['conversations'].values():
+            for entry in record['preferences']:
+                for game in entry:
+                    counts[game] = counts.get(game, 0) + 1
+        return dict(sorted(counts.items(), key=lambda item: item[1], reverse=True))

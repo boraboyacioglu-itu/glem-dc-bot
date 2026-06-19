@@ -53,18 +53,24 @@ def extract_preferences(client: OpenAI, user_inp: str,
     ]
 
 
-def build_instructions(preferences: list[dict], onboarded: bool) -> str:
+def build_instructions(preferences: list[dict], onboarded: bool,
+                       server_context: str = '') -> str:
     # Once onboarded, just give the bot the user's known preferences.
     if onboarded:
-        return (
+        instructions: str = (
             f'{SYSTEM_PROMPT}\n\n'
             f'The user\'s known game preferences are: {json.dumps(preferences)}.'
         )
+    else:
+        # Until then, the bot should ask about the user's games.
+        instructions = (
+            f'{SYSTEM_PROMPT}\n\n'
+            'You do not yet know which games this user plays. In your reply, '
+            'naturally ask them which games they play and their skill level '
+            '(beginner, intermediate, or expert).'
+        )
 
-    # Until then, the bot should ask about the user's games.
-    return (
-        f'{SYSTEM_PROMPT}\n\n'
-        'You do not yet know which games this user plays. In your reply, '
-        'naturally ask them which games they play and their skill level '
-        '(beginner, intermediate, or expert).'
-    )
+    # Make the bot aware of server-wide interests and available channels.
+    if server_context:
+        instructions += f'\n\n{server_context}'
+    return instructions

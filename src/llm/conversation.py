@@ -25,11 +25,26 @@ class Conversation:
         self.store.set_onboarded(user_id, bool(updated))
         return updated
 
+    def _server_context(self) -> str:
+        # Describe server-wide interests and joinable channels for the bot.
+        popularity: dict[str, int] = self.store.game_popularity()
+        channels: list[str] = self.store.list_channels()
+
+        interests: str = (
+            ', '.join(f'{game} ({count})' for game, count in popularity.items())
+            if popularity else 'none yet'
+        )
+        available: str = ', '.join(channels) if channels else 'none yet'
+        return (
+            f'Games other members are interested in (with counts): {interests}. '
+            f'Voice channels available to join: {available}.'
+        )
+
     def reply(self, user_id: int, user_inp: str) -> str:
         # Keep preferences current, then answer with them in context.
         preferences: list[dict] = self._update_preferences(user_id, user_inp)
         instructions: str = build_instructions(
-            preferences, self.store.get_onboarded(user_id)
+            preferences, self.store.get_onboarded(user_id), self._server_context()
         )
 
         prev_rid: str | None = self.store.get_response_id(user_id)
@@ -53,6 +68,7 @@ class Conversation:
         instructions: str = build_instructions(
             self.store.get_preferences(user_id),
             self.store.get_onboarded(user_id),
+            self._server_context(),
         )
 
         prev_rid: str | None = self.store.get_response_id(user_id)
